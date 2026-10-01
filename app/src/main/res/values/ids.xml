@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="nf_logcat_status" type="id" />
+    <item name="nf_xboard_subscription_expired" type="id" />
+    <item name="nf_xboard_app_update" type="id" />
+    <item name="nf_xboard_announcement" type="id" />
+    <item name="nf_xboard_ticket" type="id" />
 </resources>

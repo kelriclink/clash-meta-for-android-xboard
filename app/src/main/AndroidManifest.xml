@@ -118,6 +118,11 @@
             android:exported="false"
             android:label="@string/profiles" />
         <activity
+            android:name=".xboard.XboardActivity"
+            android:configChanges="uiMode"
+            android:exported="false"
+            android:label="@string/xboard_title" />
+        <activity
             android:name=".NewProfileActivity"
             android:configChanges="uiMode"
             android:exported="false"

@@ -5,6 +5,7 @@ import java.nio.file.StandardCopyOption
 plugins {
     kotlin("android")
     kotlin("kapt")
+    id("kotlinx-serialization")
     id("com.android.application")
 }
 
@@ -26,6 +27,10 @@ dependencies {
     implementation(libs.google.material)
     implementation(libs.quickie.bundled)
     implementation(libs.androidx.activity.ktx)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation(libs.kotlin.serialization.json)
+    implementation(platform("com.squareup.okhttp3:okhttp-bom:4.12.0"))
+    implementation("com.squareup.okhttp3:okhttp")
 }
 
 tasks.getByName("clean", type = Delete::class) {

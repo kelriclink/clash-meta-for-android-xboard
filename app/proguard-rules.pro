@@ -57,3 +57,8 @@
     boolean getDEBUG() return false;
     boolean getRECOVER_STACK_TRACES() return false;
 }
+
+# Keep XBoard classes and generated serializers in release builds.
+# The XBoard API layer decodes JSON via kotlinx.serialization generic helpers,
+# which R8 may shrink too aggressively when only release is minified.
+-keep class com.github.kr328.clash.xboard.** { *; }

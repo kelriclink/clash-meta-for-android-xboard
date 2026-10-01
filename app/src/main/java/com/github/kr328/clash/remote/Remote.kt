@@ -10,6 +10,10 @@ import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.store.AppStore
 import com.github.kr328.clash.util.ApplicationObserver
 import com.github.kr328.clash.util.verifyApk
+import com.github.kr328.clash.xboard.XboardSubscriptionMonitor
+import com.github.kr328.clash.xboard.XboardAppUpdateMonitor
+import com.github.kr328.clash.xboard.XboardAnnouncementMonitor
+import com.github.kr328.clash.xboard.XboardTicketMonitor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -35,9 +39,15 @@ object Remote {
                 Log.d("App becomes visible")
                 service.bind()
                 broadcasts.register()
+                XboardSubscriptionMonitor.onApplicationVisible(Global.application)
+                XboardAppUpdateMonitor.onApplicationVisible(Global.application)
+                XboardAnnouncementMonitor.onApplicationVisible(Global.application)
+                XboardTicketMonitor.onApplicationVisible(Global.application)
             }
             else {
                 Log.d("App becomes invisible")
+                XboardAppUpdateMonitor.onApplicationInvisible()
+                XboardTicketMonitor.onApplicationInvisible()
                 service.unbind()
                 broadcasts.unregister()
             }

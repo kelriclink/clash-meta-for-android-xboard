@@ -5,9 +5,16 @@ import android.content.Context
 import com.github.kr328.clash.common.Global
 import com.github.kr328.clash.common.compat.currentProcessName
 import com.github.kr328.clash.common.log.Log
+import com.github.kr328.clash.design.store.UiStore
 import com.github.kr328.clash.remote.Remote
 import com.github.kr328.clash.service.util.sendServiceRecreated
 import com.github.kr328.clash.util.clashDir
+import com.github.kr328.clash.xboard.XboardSubscriptionMonitor
+import com.github.kr328.clash.xboard.XboardTicketMonitor
+import com.github.kr328.clash.xboard.XboardSubscriptionBridge
+import com.github.kr328.clash.xboard.XboardSessionStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
@@ -29,6 +36,13 @@ class MainApplication : Application() {
         Log.d("Process $processName started")
 
         if (processName == packageName) {
+            UiStore(this).syncMainActivityAliasState()
+            Global.launch(Dispatchers.IO) {
+                XboardSubscriptionBridge(XboardSessionStore(this@MainApplication))
+                    .ensurePanelReachability()
+            }
+            XboardSubscriptionMonitor.schedule(this)
+            XboardTicketMonitor.scheduleIfNeeded(this)
             Remote.launch()
         } else {
             sendServiceRecreated()

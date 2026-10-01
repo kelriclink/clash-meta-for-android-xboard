@@ -17,10 +17,12 @@ import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.common.util.ticker
 import com.github.kr328.clash.design.MainDesign
 import com.github.kr328.clash.design.ui.ToastDuration
+import com.github.kr328.clash.store.AppStore
 import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withClash
 import com.github.kr328.clash.util.withProfile
+import com.github.kr328.clash.xboard.XboardActivity
 import com.github.kr328.clash.core.bridge.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -30,10 +32,14 @@ import java.util.concurrent.TimeUnit
 import com.github.kr328.clash.design.R as DesignR
 
 class MainActivity : BaseActivity<MainDesign>() {
+    private val appStore by lazy { AppStore(this) }
+
     override suspend fun main() {
         val design = MainDesign(this)
 
         setContentDesign(design)
+
+        ensureXboardOnboarding()
 
         design.fetch()
 
@@ -64,6 +70,8 @@ class MainActivity : BaseActivity<MainDesign>() {
                             startActivity(ProfilesActivity::class.intent)
                         MainDesign.Request.OpenProviders ->
                             startActivity(ProvidersActivity::class.intent)
+                        MainDesign.Request.OpenXboard ->
+                            startActivity(Intent(this@MainActivity, XboardActivity::class.java))
                         MainDesign.Request.OpenLogs -> {
                             if (LogcatService.running) {
                                 startActivity(LogcatActivity::class.intent)
@@ -145,6 +153,31 @@ class MainActivity : BaseActivity<MainDesign>() {
     private suspend fun queryAppVersionName(): String {
         return withContext(Dispatchers.IO) {
             packageManager.getPackageInfo(packageName, 0).versionName + "\n" + Bridge.nativeCoreVersion().replace("_", "-")
+        }
+    }
+
+    private suspend fun ensureXboardOnboarding() {
+        if (appStore.xboardOnboardingCompleted) {
+            return
+        }
+
+        val shouldLaunch = withProfile {
+            queryAll().isEmpty()
+        }
+
+        if (!shouldLaunch) {
+            appStore.xboardOnboardingCompleted = true
+            return
+        }
+
+        val result = startActivityForResult(
+            ActivityResultContracts.StartActivityForResult(),
+            Intent(this, XboardActivity::class.java)
+                .putExtra(XboardActivity.EXTRA_ONBOARDING_MODE, true)
+        )
+
+        if (result.resultCode == RESULT_OK) {
+            appStore.xboardOnboardingCompleted = true
         }
     }
 

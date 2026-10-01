@@ -26,6 +26,10 @@ object ApplicationObserver {
     val createdActivities: Set<Activity>
         get() = _createdActivities
 
+    val currentActivity: Activity?
+        @Synchronized
+        get() = _visibleActivities.lastOrNull()
+
     private val activityObserver = object : Application.ActivityLifecycleCallbacks {
         @Synchronized
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
