@@ -1,0 +1,97 @@
+name: Custom Android Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: custom-android-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
+          go-version: '1.26'
+
+      - name: Apply Go patches
+        run: |
+          cd "$(go env GOROOT)"
+          for patch_file in "$GITHUB_WORKSPACE"/.github/patch/*.patch; do
+            patch --verbose -p 1 < "$patch_file"
+          done
+
+      - name: Cache Go builds
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Preserve custom application identity
+        run: |
+          printf 'sdk.dir=%s\ncustom.application.id=com.lin.xb\nremove.suffix=true\n' "$ANDROID_HOME" > local.properties
+
+      - name: Update CA certificates
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates
+          sudo update-ca-certificates
+          cp /etc/ssl/certs/ca-certificates.crt core/src/foss/golang/clash/component/ca/ca-certificates.crt
+
+      - name: Build Meta APKs
+        run: ./gradlew --no-daemon --max-workers=2 app:assembleMetaRelease
+
+      - name: Verify APK metadata
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          output = Path('app/build/outputs/apk/meta/release')
+          metadata = json.loads((output / 'output-metadata.json').read_text())
+          gradle = Path('build.gradle.kts').read_text()
+          version_name = re.search(r'versionName = "([^"]+)"', gradle).group(1)
+          version_code = int(re.search(r'versionCode = (\d+)', gradle).group(1))
+          assert metadata['applicationId'] == 'com.lin.xb', metadata['applicationId']
+          assert len(metadata['elements']) == 5, metadata['elements']
+          for apk in metadata['elements']:
+              assert apk['versionName'] == version_name, apk
+              assert apk['versionCode'] == version_code, apk
+              assert (output / apk['outputFile']).is_file(), apk
+              print(apk['outputFile'])
+          PY
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: clash-meta-for-android-xboard-apks
+          path: |
+            app/build/outputs/apk/meta/release/*.apk
+            app/build/outputs/apk/meta/release/output-metadata.json
+          if-no-files-found: error
