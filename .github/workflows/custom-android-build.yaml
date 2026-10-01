@@ -56,6 +56,36 @@ jobs:
         run: |
           printf 'sdk.dir=%s\ncustom.application.id=com.lin.xb\nremove.suffix=true\n' "$ANDROID_HOME" > local.properties
 
+      - name: Configure original APK signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          names = ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD',
+                   'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']
+          missing = [name for name in names if not os.environ.get(name)]
+          if missing:
+              raise SystemExit('Missing signing secrets: ' + ', '.join(missing))
+          Path('release.keystore').write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+          properties = {
+              'keystore.password': os.environ['ANDROID_KEYSTORE_PASSWORD'],
+              'key.alias': os.environ['ANDROID_KEY_ALIAS'],
+              'key.password': os.environ['ANDROID_KEY_PASSWORD'],
+          }
+          def escape(value):
+              raw = value.encode('utf-16-be')
+              return ''.join('\\u' + raw[i:i + 2].hex() for i in range(0, len(raw), 2))
+          Path('signing.properties').write_text(''.join(
+              key + '=' + escape(value) + '\n' for key, value in properties.items()))
+          PY
+
       - name: Update CA certificates
         run: |
           sudo apt-get update
@@ -85,6 +115,22 @@ jobs:
               assert apk['versionCode'] == version_code, apk
               assert (output / apk['outputFile']).is_file(), apk
               print(apk['outputFile'])
+          PY
+
+      - name: Verify original APK signing certificate
+        run: |
+          python3 - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          signer = Path(os.environ['ANDROID_HOME']) / 'build-tools/35.0.0/lib/apksigner.jar'
+          expected = '3aaf9ea2e02c91c63bfe1a2f8c75c53efdcd82e5db9032cb7978e6e2fe0a38ff'
+          for apk in Path('app/build/outputs/apk/meta/release').glob('*.apk'):
+              result = subprocess.run(['java', '-jar', str(signer), 'verify', '--print-certs',
+                                       str(apk)], check=True, capture_output=True, text=True)
+              assert 'certificate SHA-256 digest: ' + expected in result.stdout, apk
+              print(apk.name + ': original signing certificate verified')
           PY
 
       - name: Upload APKs
